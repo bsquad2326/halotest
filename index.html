@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HaLow Mesh Dashboard</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-layout">
+      <div id="menu-backdrop" class="menu-backdrop" aria-hidden="true"></div>
+
+      <button id="menu-toggle" class="menu-toggle" aria-label="Toggle node status panel" aria-expanded="false">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <button
+        id="theme-toggle"
+        class="theme-toggle"
+        aria-label="Toggle light and dark mode"
+        aria-pressed="false"
+        title="Toggle theme"
+      >
+        <span class="theme-icon-sun" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img" focusable="false">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"></path>
+          </svg>
+        </span>
+        <span class="theme-switch-track" aria-hidden="true">
+          <span class="theme-switch-thumb"></span>
+        </span>
+        <span class="theme-icon-moon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img" focusable="false">
+            <path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 1 0 11 11z"></path>
+          </svg>
+        </span>
+      </button>
+      <button
+        id="map-lock-toggle"
+        class="map-lock-toggle"
+        aria-label="Toggle map lock"
+        aria-pressed="false"
+        title="Lock map"
+      >
+        <svg viewBox="0 0 24 24" role="img" focusable="false" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+          <path d="M8 11V8a4 4 0 1 1 8 0v3"></path>
+        </svg>
+      </button>
+
+      <aside id="side-panel" class="side-panel" aria-label="Node status panel">
+        <header class="panel-header">
+          <h1>OpenMANET HaLow Mesh</h1>
+          <p>Node Status</p>
+        </header>
+
+        <section id="node-status-list" class="node-status-list" aria-label="Node status list">
+          <!-- Node status boxes render here -->
+        </section>
+      </aside>
+
+      <main class="main-content">
+        <div id="mesh-map" class="mesh-map" aria-label="Mesh network map"></div>
+        <div class="map-crosshair" aria-hidden="true">
+          <span class="crosshair-h"></span>
+          <span class="crosshair-v"></span>
+          <span class="crosshair-dot"></span>
+        </div>
+        <div id="center-coords" class="center-coords" aria-live="polite"></div>
+      </main>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
