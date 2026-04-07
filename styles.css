@@ -576,6 +576,89 @@ body.light-mode .leaflet-container {
   text-decoration: underline;
 }
 
+.map-grid-label {
+  background: transparent;
+  border: 0;
+}
+
+.map-grid-label span {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fef3c7;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(251, 191, 36, 0.7);
+  border-radius: 999px;
+  padding: 0.04rem 0.28rem;
+  white-space: nowrap;
+}
+
+.square-id-grid-label span {
+  font-size: 0.55rem;
+  border-radius: 5px;
+  padding: 0.02rem 0.2rem;
+}
+
+.tenkm-grid-label span {
+  font-size: 0.54rem;
+  font-weight: 800;
+  min-width: 0.9rem;
+  text-align: center;
+  border-radius: 4px;
+  padding: 0.02rem 0.14rem;
+}
+
+.tenkm-grid-label-easting span {
+  color: #0f172a;
+  background: rgba(187, 247, 208, 0.95);
+  border-color: rgba(22, 163, 74, 0.8);
+}
+
+.tenkm-grid-label-northing span {
+  color: #0f172a;
+  background: rgba(191, 219, 254, 0.95);
+  border-color: rgba(37, 99, 235, 0.8);
+}
+
+.onekm-grid-label span {
+  font-size: 0.56rem;
+  font-weight: 800;
+  min-width: 1.2rem;
+  text-align: center;
+  border-radius: 4px;
+  padding: 0.02rem 0.14rem;
+}
+
+.onekm-grid-label-easting span {
+  color: #14532d;
+  background: rgba(220, 252, 231, 0.9);
+  border-color: rgba(22, 163, 74, 0.55);
+}
+
+.onekm-grid-label-northing span {
+  color: #1e3a8a;
+  background: rgba(219, 234, 254, 0.9);
+  border-color: rgba(37, 99, 235, 0.55);
+}
+
+body.light-mode .tenkm-grid-label-easting span {
+  color: #14532d;
+  background: rgba(220, 252, 231, 0.96);
+  border-color: rgba(22, 163, 74, 0.7);
+}
+
+body.light-mode .tenkm-grid-label-northing span {
+  color: #1e3a8a;
+  background: rgba(219, 234, 254, 0.96);
+  border-color: rgba(37, 99, 235, 0.7);
+}
+
+body.light-mode .map-grid-label span {
+  color: #7c2d12;
+  background: rgba(255, 251, 235, 0.92);
+  border-color: rgba(146, 64, 14, 0.55);
+}
+
 body.light-mode .leaflet-popup-content-wrapper,
 body.light-mode .leaflet-popup-tip {
   background: #ffffff;

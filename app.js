@@ -292,6 +292,10 @@ function renderMeshMap(nodeData) {
   });
   const centerCoords = document.getElementById("center-coords");
   let zoomLockCenter = null;
+  const gridPaneName = "mgrs-grid-pane";
+  map.createPane(gridPaneName);
+  map.getPane(gridPaneName).style.zIndex = "650";
+  map.getPane(gridPaneName).style.pointerEvents = "none";
 
   const layerAttribution =
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
@@ -321,6 +325,7 @@ function renderMeshMap(nodeData) {
     "Topo": tileLayers.topo,
     "Satellite": tileLayers.satellite,
   };
+  const gzdGridLayer = L.layerGroup();
 
   function enforceActiveLayerZoomLimit() {
     const max = Number.isFinite(activeTileLayer?.options?.maxZoom) ? activeTileLayer.options.maxZoom : 19;
@@ -330,12 +335,486 @@ function renderMeshMap(nodeData) {
     }
   }
 
-  L.control.layers(baseLayerControl, null, { position: "bottomright", collapsed: true }).addTo(map);
+  L.control.layers(baseLayerControl, { "MGRS": gzdGridLayer }, { position: "bottomright", collapsed: true }).addTo(map);
   map.on("baselayerchange", (event) => {
     activeTileLayer = event.layer;
     enforceActiveLayerZoomLimit();
+    scheduleGzdGridDraw(true);
   });
   enforceActiveLayerZoomLimit();
+
+  function gridZoneBandFromLat(lat) {
+    const bands = "CDEFGHJKLMNPQRSTUVWX";
+    if (lat < -80 || lat > 84) return null;
+    if (lat >= 72) return "X";
+    const index = Math.floor((lat + 80) / 8);
+    return bands[Math.max(0, Math.min(index, bands.length - 1))];
+  }
+
+  function gridZoneFromLon(lon) {
+    const normalized = ((((lon + 180) % 360) + 360) % 360) - 180;
+    const zone = Math.floor((normalized + 180) / 6) + 1;
+    return Math.max(1, Math.min(60, zone));
+  }
+
+  function parseMgrsSquareId(mgrsValue) {
+    const value = String(mgrsValue || "").toUpperCase();
+    const match = value.match(/^\d{1,2}[C-HJ-NP-X]([A-HJ-NP-Z]{2})/);
+    return match ? match[1] : null;
+  }
+
+  function utmCrsForZone(zone, isSouth) {
+    return `+proj=utm +zone=${zone} ${isSouth ? "+south " : ""}+datum=WGS84 +units=m +no_defs`;
+  }
+
+  function drawGzdGrid() {
+    if (!map.hasLayer(gzdGridLayer)) {
+      return;
+    }
+    gzdGridLayer.clearLayers();
+
+    const bounds = map.getBounds();
+    const south = Math.max(-80, bounds.getSouth());
+    const north = Math.min(84, bounds.getNorth());
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+
+    const startZone = gridZoneFromLon(west);
+    const endZone = gridZoneFromLon(east);
+    let zoneCount = endZone - startZone + 1;
+    if (zoneCount <= 0) zoneCount += 60;
+
+    const startBandLat = Math.floor((south + 80) / 8) * 8 - 80;
+    const endBandLat = Math.ceil((north + 80) / 8) * 8 - 80;
+
+    const zoom = map.getZoom();
+    const showGzdGridLines = zoom < 10;
+    const showGzdLabels = zoom >= 5 && zoom < 8;
+    const showSquareIds = zoom >= 7 && zoom < 16;
+    const show10kmGrid = zoom >= 9;
+    const show10kmLabels = zoom >= 10 && zoom < 16;
+    const show1kmGrid = zoom >= 13;
+    const show1kmLabels = zoom >= 13;
+
+    if (showGzdGridLines) {
+      for (let i = 0; i <= zoneCount; i += 1) {
+        const zone = ((startZone - 1 + i) % 60) + 1;
+        const lon = -180 + (zone - 1) * 6;
+        L.polyline(
+          [
+            [south, lon],
+            [north, lon],
+          ],
+          { color: "#fbbf24", weight: 1.8, opacity: 0.85, interactive: false, pane: gridPaneName }
+        ).addTo(gzdGridLayer);
+      }
+
+      for (let lat = startBandLat; lat <= endBandLat; lat += 8) {
+        if (lat < -80 || lat > 84) continue;
+        L.polyline(
+          [
+            [lat, west],
+            [lat, east],
+          ],
+          { color: "#fbbf24", weight: 1.8, opacity: 0.85, interactive: false, pane: gridPaneName }
+        ).addTo(gzdGridLayer);
+      }
+    }
+
+    if (zoom < 5) {
+      return;
+    }
+
+    let tenKmLineBudget = 2400;
+    let tenKmLabelBudget = 1200;
+    let oneKmLineBudget = 4500;
+    let oneKmLabelBudget = 1800;
+
+    if (showGzdLabels) {
+      for (let i = 0; i < zoneCount; i += 1) {
+        const zone = ((startZone - 1 + i) % 60) + 1;
+        const lonMin = -180 + (zone - 1) * 6;
+        const lonMax = lonMin + 6;
+        const cellWest = Math.max(west, lonMin);
+        const cellEast = Math.min(east, lonMax);
+        if (cellEast <= cellWest) continue;
+
+        for (let lat = startBandLat; lat < endBandLat; lat += 8) {
+          const band = gridZoneBandFromLat(lat + 4);
+          if (!band) continue;
+          const cellSouth = Math.max(south, lat);
+          const cellNorth = Math.min(north, lat + 8);
+          if (cellNorth <= cellSouth) continue;
+          const icon = L.divIcon({
+            className: "map-grid-label gzd-grid-label",
+            html: `<span>${zone}${band}</span>`,
+            iconSize: [44, 16],
+            iconAnchor: [22, 8],
+          });
+          L.marker([(cellSouth + cellNorth) / 2, (cellWest + cellEast) / 2], { icon, interactive: false, pane: gridPaneName }).addTo(gzdGridLayer);
+        }
+      }
+    }
+
+    if (!showSquareIds && !show10kmGrid) {
+      return;
+    }
+
+    for (let i = 0; i < zoneCount; i += 1) {
+      const zone = ((startZone - 1 + i) % 60) + 1;
+      const lonMin = -180 + (zone - 1) * 6;
+      const lonMax = lonMin + 6;
+      const cellWest = Math.max(west, lonMin);
+      const cellEast = Math.min(east, lonMax);
+      if (cellEast <= cellWest) continue;
+
+      for (let lat = startBandLat; lat < endBandLat; lat += 8) {
+        const band = gridZoneBandFromLat(lat + 4);
+        if (!band) continue;
+        const cellSouth = Math.max(south, lat);
+        const cellNorth = Math.min(north, lat + 8);
+        if (cellNorth <= cellSouth) continue;
+        const icon = L.divIcon({
+          className: "map-grid-label gzd-grid-label",
+          html: `<span>${zone}${band}</span>`,
+          iconSize: [44, 16],
+          iconAnchor: [22, 8],
+        });
+        L.marker([(cellSouth + cellNorth) / 2, (cellWest + cellEast) / 2], { icon, interactive: false }).addTo(gzdGridLayer);
+      }
+    }
+
+    // Square IDs (100km x 100km) rendered from true projected meter cells.
+    if (
+      map.getZoom() < 7 ||
+      !window.mgrs ||
+      typeof window.mgrs.forward !== "function" ||
+      typeof window.proj4 !== "function"
+    ) {
+      return;
+    }
+
+    for (let i = 0; i < zoneCount; i += 1) {
+      const zone = ((startZone - 1 + i) % 60) + 1;
+      const lonMin = -180 + (zone - 1) * 6;
+      const lonMax = lonMin + 6;
+      const cellWest = Math.max(west, lonMin);
+      const cellEast = Math.min(east, lonMax);
+      if (cellEast <= cellWest) continue;
+
+      for (let lat = startBandLat; lat < endBandLat; lat += 8) {
+        const band = gridZoneBandFromLat(lat + 4);
+        if (!band) continue;
+        const cellSouth = Math.max(south, lat);
+        const cellNorth = Math.min(north, lat + 8);
+        if (cellNorth <= cellSouth) continue;
+        const zoneCenterLat = (cellSouth + cellNorth) / 2;
+        const isSouth = zoneCenterLat < 0;
+        const utm = utmCrsForZone(zone, isSouth);
+        const wgs84 = "EPSG:4326";
+
+        let pSW;
+        let pSE;
+        let pNW;
+        let pNE;
+        try {
+          pSW = window.proj4(wgs84, utm, [cellWest, cellSouth]);
+          pSE = window.proj4(wgs84, utm, [cellEast, cellSouth]);
+          pNW = window.proj4(wgs84, utm, [cellWest, cellNorth]);
+          pNE = window.proj4(wgs84, utm, [cellEast, cellNorth]);
+        } catch (_error) {
+          continue;
+        }
+
+        const minE = Math.min(pSW[0], pSE[0], pNW[0], pNE[0]);
+        const maxE = Math.max(pSW[0], pSE[0], pNW[0], pNE[0]);
+        const minN = Math.min(pSW[1], pSE[1], pNW[1], pNE[1]);
+        const maxN = Math.max(pSW[1], pSE[1], pNW[1], pNE[1]);
+
+        const startE100 = Math.floor(minE / 100000) * 100000;
+        const endE100 = Math.ceil(maxE / 100000) * 100000;
+        const startN100 = Math.floor(minN / 100000) * 100000;
+        const endN100 = Math.ceil(maxN / 100000) * 100000;
+
+        for (let e = startE100; e < endE100; e += 100000) {
+          for (let n = startN100; n < endN100; n += 100000) {
+            let corners;
+            let centerPoint;
+            try {
+              corners = [
+                window.proj4(utm, wgs84, [e, n]),
+                window.proj4(utm, wgs84, [e + 100000, n]),
+                window.proj4(utm, wgs84, [e + 100000, n + 100000]),
+                window.proj4(utm, wgs84, [e, n + 100000]),
+              ];
+              centerPoint = window.proj4(utm, wgs84, [e + 50000, n + 50000]);
+            } catch (_error) {
+              continue;
+            }
+
+            const centerLon = centerPoint[0];
+            const centerLat = centerPoint[1];
+            if (centerLon < cellWest || centerLon > cellEast || centerLat < cellSouth || centerLat > cellNorth) {
+              continue;
+            }
+
+            let squareId = null;
+            try {
+              squareId = parseMgrsSquareId(window.mgrs.forward([centerLon, centerLat], 0));
+            } catch (_error) {
+              squareId = null;
+            }
+
+            L.polyline(
+              [
+                [corners[0][1], corners[0][0]],
+                [corners[1][1], corners[1][0]],
+                [corners[2][1], corners[2][0]],
+                [corners[3][1], corners[3][0]],
+                [corners[0][1], corners[0][0]],
+              ],
+              { color: "#f59e0b", weight: 1.2, opacity: 0.68, interactive: false, pane: gridPaneName }
+            ).addTo(gzdGridLayer);
+
+            if (showSquareIds && squareId) {
+              const labelIcon = L.divIcon({
+                className: "map-grid-label square-id-grid-label",
+                html: `<span>${squareId}</span>`,
+                iconSize: [32, 14],
+                iconAnchor: [16, 7],
+              });
+              L.marker([centerLat, centerLon], { icon: labelIcon, interactive: false, pane: gridPaneName }).addTo(gzdGridLayer);
+            }
+
+            // 10,000 meter (10 km) gridlines inside each 100 km square.
+            if (show10kmGrid && tenKmLineBudget > 0) {
+              for (let offset = 10000; offset < 100000; offset += 10000) {
+                if (tenKmLineBudget <= 0) break;
+
+                let verticalStart;
+                let verticalEnd;
+                let horizontalStart;
+                let horizontalEnd;
+                try {
+                  verticalStart = window.proj4(utm, wgs84, [e + offset, n]);
+                  verticalEnd = window.proj4(utm, wgs84, [e + offset, n + 100000]);
+                  horizontalStart = window.proj4(utm, wgs84, [e, n + offset]);
+                  horizontalEnd = window.proj4(utm, wgs84, [e + 100000, n + offset]);
+                } catch (_error) {
+                  continue;
+                }
+
+                L.polyline(
+                  [
+                    [verticalStart[1], verticalStart[0]],
+                    [verticalEnd[1], verticalEnd[0]],
+                  ],
+                  { color: "#fcd34d", weight: 0.9, opacity: 0.45, interactive: false, pane: gridPaneName }
+                ).addTo(gzdGridLayer);
+                tenKmLineBudget -= 1;
+
+                if (show10kmLabels && tenKmLabelBudget > 0) {
+                  const verticalMidLat = verticalStart[1] + (verticalEnd[1] - verticalStart[1]) * 0.42;
+                  const verticalMidLon = (verticalStart[0] + verticalEnd[0]) / 2;
+                  const verticalLabel = String(offset / 10000);
+                  const verticalLabelIcon = L.divIcon({
+                    className: "map-grid-label tenkm-grid-label tenkm-grid-label-easting",
+                    html: `<span>${verticalLabel}</span>`,
+                    iconSize: [26, 14],
+                    iconAnchor: [13, 7],
+                  });
+                  L.marker([verticalMidLat, verticalMidLon], { icon: verticalLabelIcon, interactive: false, pane: gridPaneName }).addTo(gzdGridLayer);
+                  tenKmLabelBudget -= 1;
+                }
+
+                if (tenKmLineBudget <= 0) break;
+
+                L.polyline(
+                  [
+                    [horizontalStart[1], horizontalStart[0]],
+                    [horizontalEnd[1], horizontalEnd[0]],
+                  ],
+                  { color: "#fcd34d", weight: 0.9, opacity: 0.45, interactive: false, pane: gridPaneName }
+                ).addTo(gzdGridLayer);
+                tenKmLineBudget -= 1;
+
+                if (show10kmLabels && tenKmLabelBudget > 0) {
+                  const horizontalMidLat = (horizontalStart[1] + horizontalEnd[1]) / 2;
+                  const horizontalMidLon = horizontalStart[0] + (horizontalEnd[0] - horizontalStart[0]) * 0.58;
+                  const horizontalLabel = String(offset / 10000);
+                  const horizontalLabelIcon = L.divIcon({
+                    className: "map-grid-label tenkm-grid-label tenkm-grid-label-northing",
+                    html: `<span>${horizontalLabel}</span>`,
+                    iconSize: [26, 14],
+                    iconAnchor: [13, 7],
+                  });
+                  L.marker([horizontalMidLat, horizontalMidLon], { icon: horizontalLabelIcon, interactive: false, pane: gridPaneName }).addTo(gzdGridLayer);
+                  tenKmLabelBudget -= 1;
+                }
+              }
+            }
+
+            // 1,000 meter (1 km) gridlines inside each 10 km cell.
+            if (show1kmGrid && oneKmLineBudget > 0) {
+              for (let e10 = e; e10 < e + 100000; e10 += 10000) {
+                for (let n10 = n; n10 < n + 100000; n10 += 10000) {
+                  for (let step = 1000; step < 10000; step += 1000) {
+                    if (oneKmLineBudget <= 0) break;
+                    let vStart;
+                    let vEnd;
+                    let hStart;
+                    let hEnd;
+                    try {
+                      vStart = window.proj4(utm, wgs84, [e10 + step, n10]);
+                      vEnd = window.proj4(utm, wgs84, [e10 + step, n10 + 10000]);
+                      hStart = window.proj4(utm, wgs84, [e10, n10 + step]);
+                      hEnd = window.proj4(utm, wgs84, [e10 + 10000, n10 + step]);
+                    } catch (_error) {
+                      continue;
+                    }
+
+                    const oneKmOpacity = zoom >= 14 ? 0.48 : 0.4;
+                    const oneKmWeight = zoom >= 14 ? 0.9 : 0.75;
+                    L.polyline(
+                      [
+                        [vStart[1], vStart[0]],
+                        [vEnd[1], vEnd[0]],
+                      ],
+                      { color: "#fef3c7", weight: oneKmWeight, opacity: oneKmOpacity, interactive: false, pane: gridPaneName }
+                    ).addTo(gzdGridLayer);
+                    oneKmLineBudget -= 1;
+
+                    const oneKmLabelStep = zoom >= 14 ? 1000 : 2000;
+                    if (show1kmLabels && oneKmLabelBudget > 0 && step % oneKmLabelStep === 0) {
+                      const eastingKm = Math.floor((((e10 + step) % 100000) + 100000) % 100000 / 1000);
+                      const verticalLabel = String(eastingKm).padStart(2, "0");
+                      const verticalMidLat = vStart[1] + (vEnd[1] - vStart[1]) * 0.36;
+                      const verticalMidLon = (vStart[0] + vEnd[0]) / 2;
+                      const vLabelIcon = L.divIcon({
+                        className: "map-grid-label onekm-grid-label onekm-grid-label-easting",
+                        html: `<span>${verticalLabel}</span>`,
+                        iconSize: [28, 14],
+                        iconAnchor: [14, 7],
+                      });
+                      L.marker([verticalMidLat, verticalMidLon], { icon: vLabelIcon, interactive: false, pane: gridPaneName }).addTo(gzdGridLayer);
+                      oneKmLabelBudget -= 1;
+                    }
+
+                    if (oneKmLineBudget <= 0) break;
+
+                    L.polyline(
+                      [
+                        [hStart[1], hStart[0]],
+                        [hEnd[1], hEnd[0]],
+                      ],
+                      { color: "#fef3c7", weight: oneKmWeight, opacity: oneKmOpacity, interactive: false, pane: gridPaneName }
+                    ).addTo(gzdGridLayer);
+                    oneKmLineBudget -= 1;
+
+                    if (show1kmLabels && oneKmLabelBudget > 0 && step % oneKmLabelStep === 0) {
+                      const northingKm = Math.floor((((n10 + step) % 100000) + 100000) % 100000 / 1000);
+                      const horizontalLabel = String(northingKm).padStart(2, "0");
+                      const horizontalMidLat = (hStart[1] + hEnd[1]) / 2;
+                      const horizontalMidLon = hStart[0] + (hEnd[0] - hStart[0]) * 0.64;
+                      const hLabelIcon = L.divIcon({
+                        className: "map-grid-label onekm-grid-label onekm-grid-label-northing",
+                        html: `<span>${horizontalLabel}</span>`,
+                        iconSize: [28, 14],
+                        iconAnchor: [14, 7],
+                      });
+                      L.marker([horizontalMidLat, horizontalMidLon], { icon: hLabelIcon, interactive: false, pane: gridPaneName }).addTo(gzdGridLayer);
+                      oneKmLabelBudget -= 1;
+                    }
+                  }
+                  if (oneKmLineBudget <= 0) break;
+                }
+                if (oneKmLineBudget <= 0) break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function syncCoordReadoutVisibility() {
+    if (!centerCoords) {
+      return;
+    }
+    centerCoords.style.display = "";
+  }
+
+  function formatMgrsForReadout(rawMgrs) {
+    const value = String(rawMgrs || "").toUpperCase().trim();
+    const match = value.match(/^(\d{1,2})([C-HJ-NP-X])([A-HJ-NP-Z]{2})(\d*)$/);
+    if (!match) {
+      return value;
+    }
+    const digits = match[4] || "";
+    const half = Math.floor(digits.length / 2);
+    const east = digits.slice(0, half);
+    const north = digits.slice(half);
+    if (!east && !north) {
+      return `${match[1]}${match[2]} ${match[3]}`;
+    }
+    return `${match[1]}${match[2]} ${match[3]} ${east} ${north}`;
+  }
+
+  function mgrsAccuracyForZoom(_zoom) {
+    return 5; // Always 10-digit MGRS (1m precision).
+  }
+
+  let gzdDrawScheduled = false;
+  let gzdDrawTimer = null;
+  function scheduleGzdGridDraw(immediate = false) {
+    if (!map.hasLayer(gzdGridLayer)) {
+      return;
+    }
+    if (gzdDrawTimer) {
+      window.clearTimeout(gzdDrawTimer);
+      gzdDrawTimer = null;
+    }
+    if (immediate) {
+      if (gzdDrawScheduled) {
+        return;
+      }
+      gzdDrawScheduled = true;
+      window.requestAnimationFrame(() => {
+        gzdDrawScheduled = false;
+        drawGzdGrid();
+      });
+      return;
+    }
+    gzdDrawTimer = window.setTimeout(() => {
+      gzdDrawTimer = null;
+      if (gzdDrawScheduled) {
+        return;
+      }
+      gzdDrawScheduled = true;
+      window.requestAnimationFrame(() => {
+        gzdDrawScheduled = false;
+        drawGzdGrid();
+      });
+    }, 90);
+  }
+
+  map.on("overlayadd", (event) => {
+    if (event.layer === gzdGridLayer) {
+      scheduleGzdGridDraw(true);
+      syncCoordReadoutVisibility();
+      updateCenterReadout();
+    }
+  });
+  map.on("overlayremove", (event) => {
+    if (event.layer === gzdGridLayer) {
+      gzdGridLayer.clearLayers();
+      syncCoordReadoutVisibility();
+      updateCenterReadout();
+    }
+  });
+  map.on("moveend", () => scheduleGzdGridDraw(true));
+  map.on("zoomend", () => scheduleGzdGridDraw(true));
+  map.on("load", () => scheduleGzdGridDraw(true));
 
   const nodesById = new Map(nodeData.map((node) => [node.id, node]));
   const bounds = [];
@@ -475,12 +954,22 @@ function renderMeshMap(nodeData) {
       return;
     }
     const center = map.getCenter();
+    if (map.hasLayer(gzdGridLayer) && window.mgrs && typeof window.mgrs.forward === "function") {
+      try {
+        const rawMgrs = window.mgrs.forward([center.lng, center.lat], mgrsAccuracyForZoom(map.getZoom()));
+        centerCoords.textContent = formatMgrsForReadout(rawMgrs);
+        return;
+      } catch (_error) {
+        // Fallback to lat/lon if MGRS conversion fails.
+      }
+    }
     centerCoords.textContent = `${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
   }
 
   updateCenterReadout();
   map.on("move", updateCenterReadout);
   map.on("zoom", updateCenterReadout);
+  syncCoordReadoutVisibility();
 
   // Keep pinch/wheel zoom anchored to the current crosshair center.
   map.on("zoomstart", () => {
