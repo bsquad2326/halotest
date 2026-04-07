@@ -72,12 +72,26 @@ function renderNodeCard(node) {
   return card;
 }
 
+<<<<<<< HEAD
 function renderSidebarStatusList(nodeData) {
+=======
+function renderSidebarStatusList(nodeData, onNodeSelect) {
+>>>>>>> 3797786 (update)
   const list = document.getElementById("node-status-list");
   list.innerHTML = "";
 
   nodeData.forEach((node) => {
+<<<<<<< HEAD
     list.appendChild(renderNodeCard(node));
+=======
+    const card = renderNodeCard(node);
+    card.addEventListener("click", () => {
+      if (typeof onNodeSelect === "function") {
+        onNodeSelect(node.id);
+      }
+    });
+    list.appendChild(card);
+>>>>>>> 3797786 (update)
   });
 }
 
@@ -187,6 +201,10 @@ function renderMeshMap(nodeData) {
   const linkLayer = L.layerGroup();
   const networkLayer = L.layerGroup();
   const networksById = new Map();
+<<<<<<< HEAD
+=======
+  const nodeMarkersById = new Map();
+>>>>>>> 3797786 (update)
 
   links.forEach(([from, to]) => {
     const source = nodesById.get(from);
@@ -228,6 +246,10 @@ function renderMeshMap(nodeData) {
     });
 
     const marker = L.marker([node.lat, node.lon], { icon }).addTo(nodeLayer);
+<<<<<<< HEAD
+=======
+    nodeMarkersById.set(node.id, marker);
+>>>>>>> 3797786 (update)
     marker.bindTooltip(node.name, {
       direction: "top",
       offset: [0, -22],
@@ -316,7 +338,28 @@ function renderMeshMap(nodeData) {
     });
   }
 
+<<<<<<< HEAD
   return { setMapTheme, setMapLocked };
+=======
+  function focusNodeById(nodeId) {
+    const marker = nodeMarkersById.get(nodeId);
+    const node = nodesById.get(nodeId);
+    if (!marker || !node) {
+      return;
+    }
+
+    if (map.getZoom() <= CONSOLIDATE_ZOOM_LEVEL) {
+      map.setZoom(CONSOLIDATE_ZOOM_LEVEL + 2);
+    }
+    map.flyTo([node.lat, node.lon], Math.max(map.getZoom(), CONSOLIDATE_ZOOM_LEVEL + 2), {
+      animate: true,
+      duration: 0.6,
+    });
+    window.setTimeout(() => marker.openPopup(), 350);
+  }
+
+  return { setMapTheme, setMapLocked, focusNodeById };
+>>>>>>> 3797786 (update)
 }
 
 function setupThemeToggle(mapApi) {
@@ -411,8 +454,17 @@ function setupHamburgerMenu() {
   });
 }
 
+<<<<<<< HEAD
 renderSidebarStatusList(nodes);
 const mapApi = renderMeshMap(nodes);
+=======
+const mapApi = renderMeshMap(nodes);
+renderSidebarStatusList(nodes, (nodeId) => {
+  if (mapApi && typeof mapApi.focusNodeById === "function") {
+    mapApi.focusNodeById(nodeId);
+  }
+});
+>>>>>>> 3797786 (update)
 setupHamburgerMenu();
 const themeApi = setupThemeToggle(mapApi);
 setupMapLockToggle(mapApi, themeApi);
