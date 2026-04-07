@@ -50,10 +50,11 @@ body {
 }
 
 .menu-toggle {
+  --menu-tab-x: 0px;
   position: fixed;
   top: 50%;
   left: 0;
-  transform: translateY(-50%);
+  transform: translate(var(--menu-tab-x), -50%);
   width: 24px;
   height: 112px;
   border: 1px solid var(--border);
@@ -69,6 +70,7 @@ body {
   align-items: center;
   cursor: pointer;
   z-index: 4;
+  transition: transform 0.22s ease;
 }
 
 .menu-toggle span {
@@ -242,6 +244,10 @@ body.menu-open .menu-backdrop {
   pointer-events: auto;
 }
 
+body.menu-open .menu-toggle {
+  --menu-tab-x: calc(min(340px, calc(100vw - 2rem)) + 1rem);
+}
+
 .panel-header h1 {
   margin: 0;
   font-size: 1.1rem;
@@ -259,15 +265,132 @@ body.menu-open .menu-backdrop {
   gap: 0.75rem;
 }
 
+.network-group {
+  background: color-mix(in srgb, var(--card) 65%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.55rem;
+}
+
+.network-group-header h3 {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.network-group-header p {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.network-group-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.network-group-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.network-group-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.network-group-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.network-group-header-text {
+  display: block;
+}
+
+.network-group-header-text p {
+  margin-bottom: 0.15rem;
+}
+
+.network-group-chevron {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1;
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+  margin-top: 0.2rem;
+}
+
+.network-group-details[open] .network-group-chevron {
+  transform: rotate(0deg);
+}
+
+.network-visibility-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid #ef4444;
+  background: transparent;
+  color: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.network-visibility-toggle svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.network-visibility-toggle .icon-eye-off {
+  display: none;
+}
+
+.network-visibility-toggle.active {
+  background: #ef4444;
+}
+
+body:not(.light-mode) .network-visibility-toggle.active {
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+body.light-mode .network-visibility-toggle.active {
+  color: #0f172a;
+  border-color: #0f172a;
+}
+
+.network-visibility-toggle.active .icon-eye {
+  display: none;
+}
+
+.network-visibility-toggle.active .icon-eye-off {
+  display: block;
+}
+
+.network-hidden .network-group-header-text {
+  opacity: 0.65;
+}
+
+.network-group-nodes {
+  display: grid;
+  gap: 0.55rem;
+}
+
 .node-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.75rem;
-<<<<<<< HEAD
-=======
   cursor: pointer;
->>>>>>> 3797786 (update)
 }
 
 .node-head {
@@ -535,25 +658,57 @@ body.light-mode .leaflet-popup-tip {
   background: var(--down);
 }
 
+.network-cluster-wrap {
+  position: relative;
+  width: 220px;
+  height: 74px;
+}
+
 .network-cluster {
-  min-width: 120px;
-  border-radius: 999px;
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  min-width: 196px;
+  max-width: 210px;
+  border-radius: 12px;
   border: 1px solid;
-  padding: 0.35rem 0.7rem;
+  padding: 0.35rem 0.6rem;
   background: color-mix(in srgb, var(--panel) 90%, transparent);
   text-align: center;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
+.network-cluster-content {
+  display: grid;
+  gap: 0.12rem;
+  justify-items: center;
+}
+
 .network-cluster-name {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .network-cluster-meta {
-  margin-top: 0.1rem;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   color: var(--muted);
+}
+
+.network-cluster-connector {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  width: 2px;
+  height: 26px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: currentColor;
+  opacity: 0.85;
 }
 
 body.light-mode .map-dot-label {
@@ -579,6 +734,10 @@ body.light-mode .map-dot-label {
 }
 
 @media (max-width: 900px) {
+  body.menu-open .menu-toggle {
+    --menu-tab-x: calc(100vw - 1rem);
+  }
+
   .map-lock-toggle {
     right: calc(1rem + 92px + 0.45rem);
   }

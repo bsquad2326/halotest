@@ -1,49 +1,119 @@
-const nodes = [
+const NETWORKS = [
   {
-    id: "node-01",
-    meshId: "mesh-west",
-    meshName: "West Mesh",
-    name: "Gateway-01",
-    status: "online",
-    signal: "-58 dBm",
-    clients: 5,
-    lat: 37.7749,
-    lon: -122.4194,
+    id: "mesh-cedarburg",
+    name: "Cedarburg Test Network",
+    location: "Cedarburg, WI",
+    nodes: [
+      {
+        id: "ced-gw-01",
+        name: "Cedarburg-Gateway",
+        status: "online",
+        signal: "-57 dBm",
+        clients: 6,
+        lat: 43.2962,
+        lon: -87.9873,
+      },
+      {
+        id: "ced-relay-02",
+        name: "Cedarburg-Relay",
+        status: "degraded",
+        signal: "-81 dBm",
+        clients: 3,
+        lat: 43.3001,
+        lon: -87.9805,
+      },
+      {
+        id: "ced-edge-03",
+        name: "Cedarburg-Edge",
+        status: "online",
+        signal: "-66 dBm",
+        clients: 2,
+        lat: 43.2924,
+        lon: -87.9938,
+      },
+    ],
+    links: [
+      ["ced-gw-01", "ced-relay-02"],
+      ["ced-relay-02", "ced-edge-03"],
+      ["ced-gw-01", "ced-edge-03"],
+    ],
   },
   {
-    id: "node-02",
-    meshId: "mesh-west",
-    meshName: "West Mesh",
-    name: "Relay-02",
-    status: "degraded",
-    signal: "-84 dBm",
-    clients: 2,
-    lat: 37.7791,
-    lon: -122.4075,
+    id: "mesh-venice",
+    name: "Venice Field Network",
+    location: "Venice, FL",
+    nodes: [
+      {
+        id: "ven-gw-01",
+        name: "Venice-Gateway",
+        status: "online",
+        signal: "-60 dBm",
+        clients: 4,
+        lat: 27.0788,
+        lon: -82.4096,
+      },
+      {
+        id: "ven-tigers-eye-02",
+        name: "Tigers Eye Drive Node",
+        status: "online",
+        signal: "-64 dBm",
+        clients: 1,
+        lat: 27.0699,
+        lon: -82.3852,
+      },
+    ],
+    links: [["ven-gw-01", "ven-tigers-eye-02"]],
   },
   {
-    id: "node-03",
-    meshId: "mesh-east",
-    meshName: "East Mesh",
-    name: "Edge-03",
-    status: "offline",
-    signal: "n/a",
-    clients: 0,
-    lat: 37.7682,
-    lon: -122.3958,
-  },
-  {
-    id: "node-04",
-    meshId: "mesh-east",
-    meshName: "East Mesh",
-    name: "Edge-04",
-    status: "online",
-    signal: "-66 dBm",
-    clients: 3,
-    lat: 37.7618,
-    lon: -122.4175,
+    id: "mesh-lexington",
+    name: "Lexington Test Network",
+    location: "Lexington, VA",
+    nodes: [
+      {
+        id: "lex-vmi-barracks-01",
+        name: "VMI Barracks Node",
+        status: "online",
+        signal: "-62 dBm",
+        clients: 5,
+        lat: 37.7866,
+        lon: -79.4455,
+      },
+      {
+        id: "lex-wl-pool-02",
+        name: "WL Pool Node",
+        status: "degraded",
+        signal: "-78 dBm",
+        clients: 2,
+        lat: 37.7887,
+        lon: -79.4424,
+      },
+      {
+        id: "lex-vmi-aquatic-03",
+        name: "VMI Aquatic Center Node",
+        status: "online",
+        signal: "-67 dBm",
+        clients: 3,
+        lat: 37.7839,
+        lon: -79.4441,
+      },
+    ],
+    links: [
+      ["lex-vmi-barracks-01", "lex-wl-pool-02"],
+      ["lex-wl-pool-02", "lex-vmi-aquatic-03"],
+      ["lex-vmi-barracks-01", "lex-vmi-aquatic-03"],
+    ],
   },
 ];
+
+const nodes = NETWORKS.flatMap((network) =>
+  network.nodes.map((node) => ({
+    ...node,
+    meshId: network.id,
+    meshName: network.name,
+    meshLocation: network.location,
+  }))
+);
+const networkLinks = NETWORKS.flatMap((network) => network.links);
 
 const CONSOLIDATE_ZOOM_LEVEL = 13;
 const THEME_STORAGE_KEY = "halow-mesh-theme";
@@ -72,26 +142,99 @@ function renderNodeCard(node) {
   return card;
 }
 
-<<<<<<< HEAD
-function renderSidebarStatusList(nodeData) {
-=======
-function renderSidebarStatusList(nodeData, onNodeSelect) {
->>>>>>> 3797786 (update)
+function renderSidebarStatusList(networks, onNodeSelect, onNetworkToggle) {
   const list = document.getElementById("node-status-list");
   list.innerHTML = "";
 
-  nodeData.forEach((node) => {
-<<<<<<< HEAD
-    list.appendChild(renderNodeCard(node));
-=======
-    const card = renderNodeCard(node);
-    card.addEventListener("click", () => {
-      if (typeof onNodeSelect === "function") {
-        onNodeSelect(node.id);
+  function reorderGroups() {
+    const groups = Array.from(list.querySelectorAll(".network-group"));
+    groups.sort((a, b) => {
+      const aHidden = a.classList.contains("network-hidden") ? 1 : 0;
+      const bHidden = b.classList.contains("network-hidden") ? 1 : 0;
+      if (aHidden !== bHidden) {
+        return aHidden - bHidden;
+      }
+      const aOrder = Number(a.dataset.order || 0);
+      const bOrder = Number(b.dataset.order || 0);
+      return aOrder - bOrder;
+    });
+    groups.forEach((group) => list.appendChild(group));
+  }
+
+  networks.forEach((network, index) => {
+    const group = document.createElement("section");
+    group.className = "network-group";
+    group.dataset.order = String(index);
+    group.innerHTML = `
+      <details class="network-group-details" open>
+        <summary class="network-group-header">
+          <span class="network-group-header-text">
+            <h3>${network.name}</h3>
+            <p>${network.location}</p>
+          </span>
+          <span class="network-group-actions">
+            <button
+              class="network-visibility-toggle"
+              type="button"
+              aria-label="Hide ${network.name}"
+              aria-pressed="false"
+              title="Hide network"
+              data-network-id="${network.id}"
+            >
+              <svg class="icon-eye" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="icon-eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-6 10-6c2.1 0 3.8.6 5.2 1.5M22 12s-3.5 6-10 6c-2.1 0-3.8-.6-5.2-1.5"></path>
+                <path d="M3 3l18 18"></path>
+              </svg>
+            </button>
+            <span class="network-group-chevron" aria-hidden="true">▾</span>
+          </span>
+        </summary>
+        <div class="network-group-nodes"></div>
+      </details>
+    `;
+
+    const visibilityToggle = group.querySelector(".network-visibility-toggle");
+    const details = group.querySelector(".network-group-details");
+    let visible = true;
+    visibilityToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      visible = !visible;
+      visibilityToggle.classList.toggle("active", !visible);
+      visibilityToggle.setAttribute("aria-pressed", String(!visible));
+      visibilityToggle.setAttribute("aria-label", `${visible ? "Hide" : "Show"} ${network.name}`);
+      visibilityToggle.setAttribute("title", `${visible ? "Hide" : "Show"} network`);
+      group.classList.toggle("network-hidden", !visible);
+      if (!visible && details) {
+        details.open = false;
+      }
+      reorderGroups();
+      if (typeof onNetworkToggle === "function") {
+        onNetworkToggle(network.id, visible);
       }
     });
-    list.appendChild(card);
->>>>>>> 3797786 (update)
+
+    const nodesContainer = group.querySelector(".network-group-nodes");
+    network.nodes.forEach((node) => {
+      const nodeWithNetwork = {
+        ...node,
+        meshId: network.id,
+        meshName: network.name,
+      };
+      const card = renderNodeCard(nodeWithNetwork);
+      card.addEventListener("click", () => {
+        if (typeof onNodeSelect === "function") {
+          onNodeSelect(node.id);
+        }
+      });
+      nodesContainer.appendChild(card);
+    });
+
+    list.appendChild(group);
   });
 }
 
@@ -107,10 +250,15 @@ function markerHtml(node) {
 
 function networkMarkerHtml(network) {
   return `
-    <article class="network-cluster cluster-${network.status}">
-      <div class="network-cluster-name">${network.name}</div>
-      <div class="network-cluster-meta">${network.nodeCount} nodes</div>
-    </article>
+    <div class="network-cluster-wrap cluster-${network.status}">
+      <article class="network-cluster">
+        <div class="network-cluster-content">
+          <div class="network-cluster-name">${network.name}</div>
+          <div class="network-cluster-meta">${network.nodeCount} nodes</div>
+        </div>
+      </article>
+      <span class="network-cluster-connector" aria-hidden="true"></span>
+    </div>
   `;
 }
 
@@ -188,25 +336,19 @@ function renderMeshMap(nodeData) {
   });
   enforceActiveLayerZoomLimit();
 
-  const links = [
-    ["node-01", "node-02"],
-    ["node-02", "node-03"],
-    ["node-02", "node-04"],
-    ["node-01", "node-04"],
-  ];
-
   const nodesById = new Map(nodeData.map((node) => [node.id, node]));
   const bounds = [];
   const nodeLayer = L.layerGroup();
   const linkLayer = L.layerGroup();
   const networkLayer = L.layerGroup();
   const networksById = new Map();
-<<<<<<< HEAD
-=======
   const nodeMarkersById = new Map();
->>>>>>> 3797786 (update)
+  const nodeMarkersByNetwork = new Map();
+  const linksByNetwork = new Map();
+  const networkMarkersById = new Map();
+  const hiddenNetworkIds = new Set();
 
-  links.forEach(([from, to]) => {
+  networkLinks.forEach(([from, to]) => {
     const source = nodesById.get(from);
     const target = nodesById.get(to);
     if (!source || !target) {
@@ -222,13 +364,18 @@ function renderMeshMap(nodeData) {
 
     const color = linkStatus === "offline" ? "#ef4444" : linkStatus === "degraded" ? "#eab308" : "#22c55e";
 
-    L.polyline(
+    const line = L.polyline(
       [
         [source.lat, source.lon],
         [target.lat, target.lon],
       ],
       { color, weight: 3, opacity: 0.8 }
-    ).addTo(linkLayer);
+    );
+    const meshId = source.meshId;
+    if (!linksByNetwork.has(meshId)) {
+      linksByNetwork.set(meshId, []);
+    }
+    linksByNetwork.get(meshId).push(line);
   });
 
   nodeData.forEach((node) => {
@@ -246,10 +393,11 @@ function renderMeshMap(nodeData) {
     });
 
     const marker = L.marker([node.lat, node.lon], { icon }).addTo(nodeLayer);
-<<<<<<< HEAD
-=======
     nodeMarkersById.set(node.id, marker);
->>>>>>> 3797786 (update)
+    if (!nodeMarkersByNetwork.has(node.meshId)) {
+      nodeMarkersByNetwork.set(node.meshId, []);
+    }
+    nodeMarkersByNetwork.get(node.meshId).push(marker);
     marker.bindTooltip(node.name, {
       direction: "top",
       offset: [0, -22],
@@ -266,26 +414,50 @@ function renderMeshMap(nodeData) {
       const icon = L.divIcon({
         className: "mesh-network-icon",
         html: networkMarkerHtml(network),
-        iconSize: [140, 60],
-        iconAnchor: [70, 30],
+        iconSize: [220, 74],
+        iconAnchor: [110, 74],
       });
 
       const marker = L.marker([network.lat, network.lon], { icon }).addTo(networkLayer);
+      networkMarkersById.set(network.id, marker);
       marker.bindPopup(
         `<strong>${network.name}</strong><br>Status: ${titleCase(network.status)}<br>Total Nodes: ${network.nodeCount}<br>Lat: ${network.lat.toFixed(6)}<br>Lon: ${network.lon.toFixed(6)}`
       );
     });
 
+  function isNetworkVisible(networkId) {
+    return !hiddenNetworkIds.has(networkId);
+  }
+
   function syncLayersByZoom() {
+    nodeLayer.clearLayers();
+    linkLayer.clearLayers();
+    networkLayer.clearLayers();
+
     const showNetworks = map.getZoom() <= CONSOLIDATE_ZOOM_LEVEL;
     if (showNetworks) {
-      if (map.hasLayer(nodeLayer)) map.removeLayer(nodeLayer);
-      if (map.hasLayer(linkLayer)) map.removeLayer(linkLayer);
+      networkMarkersById.forEach((marker, networkId) => {
+        if (isNetworkVisible(networkId)) {
+          networkLayer.addLayer(marker);
+        }
+      });
       if (!map.hasLayer(networkLayer)) map.addLayer(networkLayer);
       return;
     }
 
-    if (map.hasLayer(networkLayer)) map.removeLayer(networkLayer);
+    nodeMarkersByNetwork.forEach((markers, networkId) => {
+      if (!isNetworkVisible(networkId)) {
+        return;
+      }
+      markers.forEach((marker) => nodeLayer.addLayer(marker));
+    });
+    linksByNetwork.forEach((lines, networkId) => {
+      if (!isNetworkVisible(networkId)) {
+        return;
+      }
+      lines.forEach((line) => linkLayer.addLayer(line));
+    });
+
     if (!map.hasLayer(linkLayer)) map.addLayer(linkLayer);
     if (!map.hasLayer(nodeLayer)) map.addLayer(nodeLayer);
   }
@@ -338,15 +510,15 @@ function renderMeshMap(nodeData) {
     });
   }
 
-<<<<<<< HEAD
-  return { setMapTheme, setMapLocked };
-=======
   function focusNodeById(nodeId) {
     const marker = nodeMarkersById.get(nodeId);
     const node = nodesById.get(nodeId);
     if (!marker || !node) {
       return;
     }
+
+    hiddenNetworkIds.delete(node.meshId);
+    syncLayersByZoom();
 
     if (map.getZoom() <= CONSOLIDATE_ZOOM_LEVEL) {
       map.setZoom(CONSOLIDATE_ZOOM_LEVEL + 2);
@@ -358,8 +530,16 @@ function renderMeshMap(nodeData) {
     window.setTimeout(() => marker.openPopup(), 350);
   }
 
-  return { setMapTheme, setMapLocked, focusNodeById };
->>>>>>> 3797786 (update)
+  function setNetworkVisibility(networkId, visible) {
+    if (visible) {
+      hiddenNetworkIds.delete(networkId);
+    } else {
+      hiddenNetworkIds.add(networkId);
+    }
+    syncLayersByZoom();
+  }
+
+  return { setMapTheme, setMapLocked, focusNodeById, setNetworkVisibility };
 }
 
 function setupThemeToggle(mapApi) {
@@ -454,17 +634,16 @@ function setupHamburgerMenu() {
   });
 }
 
-<<<<<<< HEAD
-renderSidebarStatusList(nodes);
 const mapApi = renderMeshMap(nodes);
-=======
-const mapApi = renderMeshMap(nodes);
-renderSidebarStatusList(nodes, (nodeId) => {
+renderSidebarStatusList(NETWORKS, (nodeId) => {
   if (mapApi && typeof mapApi.focusNodeById === "function") {
     mapApi.focusNodeById(nodeId);
   }
+}, (networkId, visible) => {
+  if (mapApi && typeof mapApi.setNetworkVisibility === "function") {
+    mapApi.setNetworkVisibility(networkId, visible);
+  }
 });
->>>>>>> 3797786 (update)
 setupHamburgerMenu();
 const themeApi = setupThemeToggle(mapApi);
 setupMapLockToggle(mapApi, themeApi);
