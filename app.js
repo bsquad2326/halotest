@@ -291,6 +291,7 @@ function renderMeshMap(nodeData) {
     touchZoom: "center",
   });
   const centerCoords = document.getElementById("center-coords");
+  let zoomLockCenter = null;
 
   const layerAttribution =
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
@@ -480,6 +481,20 @@ function renderMeshMap(nodeData) {
   updateCenterReadout();
   map.on("move", updateCenterReadout);
   map.on("zoom", updateCenterReadout);
+
+  // Keep pinch/wheel zoom anchored to the current crosshair center.
+  map.on("zoomstart", () => {
+    zoomLockCenter = map.getCenter();
+  });
+  map.on("zoom", () => {
+    if (!zoomLockCenter) {
+      return;
+    }
+    map.panTo(zoomLockCenter, { animate: false });
+  });
+  map.on("zoomend", () => {
+    zoomLockCenter = null;
+  });
 
   function setMapTheme(theme) {
     void theme;
