@@ -52,32 +52,27 @@ body {
 .menu-toggle {
   --menu-tab-x: 0px;
   position: fixed;
-  top: 50%;
-  left: 0;
-  transform: translate(var(--menu-tab-x), -50%);
-  width: 24px;
-  height: 112px;
+  left: max(0.6rem, env(safe-area-inset-left));
+  bottom: max(0.9rem, env(safe-area-inset-bottom));
+  transform: translate(var(--menu-tab-x), 0);
+  width: 64px;
+  height: 34px;
   border: 1px solid var(--border);
-  border-left: none;
-  border-radius: 0 12px 12px 0;
+  border-radius: 10px;
   background: color-mix(in srgb, var(--panel) 92%, transparent);
-  display: flex;
-  flex-direction: row;
-  gap: 5px;
-  align-content: center;
-  justify-items: center;
+  display: inline-flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   z-index: 4;
-  transition: transform 0.22s ease;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
 }
 
-.menu-toggle span {
-  width: 2px;
-  height: 22px;
-  background: var(--text);
-  border-radius: 2px;
+.menu-toggle-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
 }
 
 .theme-toggle {
@@ -245,7 +240,9 @@ body.menu-open .menu-backdrop {
 }
 
 body.menu-open .menu-toggle {
-  --menu-tab-x: calc(min(340px, calc(100vw - 2rem)) + 1rem);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .panel-header h1 {
@@ -460,9 +457,9 @@ body.light-mode .network-visibility-toggle.active {
 
 .center-coords {
   position: fixed;
-  left: 1rem;
-  bottom: 1rem;
-  transform: none;
+  left: 50%;
+  bottom: max(0.9rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
   pointer-events: none;
   z-index: 3;
   font-size: 0.66rem;
@@ -734,10 +731,6 @@ body.light-mode .map-dot-label {
 }
 
 @media (max-width: 900px) {
-  body.menu-open .menu-toggle {
-    --menu-tab-x: calc(100vw - 1rem);
-  }
-
   .map-lock-toggle {
     right: calc(1rem + 92px + 0.45rem);
   }
